@@ -16,43 +16,53 @@ hide_streamlit_style = """
 st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
 
-if 'C' not in st.session_state:
-    st.session_state['C'] = classification.ClassifierLite()
-classifier = st.session_state['C']
+if 'df' not in st.session_state:
+    st.session_state['df'] = None
+
+if 'test' not in st.session_state:
+    st.session_state['test'] = None
+
+st.session_state['selected_features'] = None
 
 st.header("Upload your data")
+
+# upload data
 file = st.file_uploader("upload file", type={"csv", "txt"})
 
 # if upload successful,
 if file is not None:
-    classifier.df = pd.read_csv(file)
+    # classifier = Classifier(file)
+    # classifier.select_features()
+    st.session_state['df'] = pd.read_csv(file)
     st.write("Lựa chọn biến mong đợi (label, target) để xây dựng mô hình")
-    classifier.features = list(classifier.df.columns)
-    classifier.target_name = st.selectbox("Target", classifier.features)
+    st.session_state['features'] = list(st.session_state['df'].columns)
+    st.session_state['target_name'] = st.selectbox("Target", st.session_state['features'])
+    # X = st.session_state['df'].loc[:,list(set(features) - {target_name})]
+    # Y = st.session_state['df'].loc[:,[target_name]]
 
     st.header("Select features")
     st.write("Lựa chọn yếu tố ảnh hưởng (features) để xây dựng mô hình máy học")
     with st.form("Machine Learning task"):
-        classifier.select_all = st.checkbox("Select all features")
-        if classifier.select_all:
-            classifier.selected_features = list(
-                set(classifier.features) - {classifier.target_name})
+        select_all = st.checkbox("Select all features")
+        if select_all:
+            st.session_state['selected_features'] = list(
+                set(st.session_state['features']) - {st.session_state['target_name']})
         else:
-            classifier.selected_features = st.multiselect("Select features", list(
-                set(classifier.features) - {classifier.target_name}))
+            st.session_state['selected_features'] = st.multiselect("Select features", list(
+                set(st.session_state['features']) - {st.session_state['target_name']}))
         checked = st.checkbox("Display data profiling")
         submitted = st.form_submit_button("Xây dựng mô hình máy học")
 
-    if classifier.selected_features and submitted:
+    if st.session_state['selected_features'] and submitted:
         # visualize targets
-        df = classifier.df.loc[:, [classifier.target_name] + classifier.selected_features]
+        df = st.session_state['df'].loc[:, [st.session_state['target_name']] + st.session_state['selected_features']]
         if checked:
             st.header("Display profile của dữ liệu")
-            pr = df.profile_report()
-            st_profile_report(pr)
+            st.session_state['pr'] = df.profile_report()
+            st_profile_report(st.session_state['pr'])
 
         # feature engineering
-        X, y = utils.feature_engineering(df, target_name=classifier.target_name)
+        X, y = utils.feature_engineering(df, target_name=st.session_state['target_name'])
 
         # lightgbm
         model, acc_score = classification.auto_lightgbm(X,y)
